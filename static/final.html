@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Processor Data</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <style>
+        /* ... (styles remain the same) ... */
+    </style>
+</head>
+<body>
+
+<h1>Select Calculation Method:</h1>
+<select id="calculationMethod">
+    <option value="weighted">Weighted Value</option>
+    <option value="logarithmic">Logarithmic Normalization</option>
+    <option value="core_ratio">Price per Core / Performance per Core</option>
+    <option value="tdp_weighted">Weighted with TDP</option>
+    <option value="complex">Complex Formula</option>
+</select>
+
+<div id="parameters">
+    <!-- Parameters will be dynamically added here -->
+</div>
+
+<button id="calculate">Calculate</button>
+<button id="update">Update Data</button>
+
+<h2>Processor Data</h2>
+<table id="processorTable">
+    <thead>
+        <tr>
+            <th onclick="sortTable(0)">Processor</th>
+            <th onclick="sortTable(1)">Single Core</th>
+            <th onclick="sortTable(2)">Multi Core</th>
+            <th onclick="sortTable(3)">Price</th>
+            <th onclick="sortTable(4)">TDP</th>
+            <th onclick="sortTable(5)">Result</th>
+        </tr>
+    </thead>
+    <tbody>
+        <!-- Data will be loaded here -->
+    </tbody>
+</table>
+
+<script>
+    let processorData = [];
+
+    function loadCSV() {
+        $.get('processor_data.csv', function(response) {
+            processorData = [];
+            const rows = response.split("\n").slice(1);
+            rows.forEach(row => {
+                const cols = row.split(",");
+                if (cols.length >= 6) {  // Now we expect 6 columns (including URL)
+                    processorData.push({
+                        Processor: cols[0],
+                        SingleCore: parseFloat(cols[1]) || 0,
+                        MultiCore: parseFloat(cols[2]) || 0,
+                        Price: parseFloat(cols[3]) || 0,
+                        TDP: parseFloat(cols[4]) || 0,
+                        URL: cols[5] ? cols[5].trim() : '',  // Capture the URL
+                        Result: 0
+                    });
+                }
+            });
+            calculateResults();
+        });
+    } // <-- Missing closing bracket for loadCSV
+
+    function displayData() {
+        const tableBody = $('#processorTable tbody');
+        tableBody.empty();
+        processorData.forEach(proc => {
+            const priceLink = proc.URL ? `<a href="${proc.URL}" target="_blank">${proc.Price}</a>` : proc.Price;  // Create a clickable link if URL exists
+            const newRow = `<tr>
+                <td>${proc.Processor}</td>
+                <td>${proc.SingleCore}</td>
+                <td>${proc.MultiCore}</td>
+                <td>${priceLink}</td>  <!-- Link for the price -->
+                <td>${proc.TDP}</td>
+                <td>${proc.Result.toFixed(2)}</td>
+            </tr>`;
+            tableBody.append(newRow);
+        });
+    } // <-- Missing closing bracket for displayData
+
+    function addParameters() {
+        const method = $('#calculationMethod').val();
+        const paramsDiv = $('#parameters');
+        paramsDiv.empty();
+
+        if (['weighted', 'tdp_weighted', 'complex'].includes(method)) {
+            paramsDiv.append(`
+                <label for="w1">w1 (Single-Core Weight):</label>
+                <input type="number" id="w1" value="1" step="0.1"><br>
+                <label for="w2">w2 (Multi-Core Weight):</label>
+                <input type="number" id="w2" value="1" step="0.1"><br>
+            `);
+        }
+    }
+
+    function calculateResults() {
+        const method = $('#calculationMethod').val();
+        const w1 = parseFloat($('#w1').val()) || 1;
+        const w2 = parseFloat($('#w2').val()) || 1;
+
+        processorData.forEach(proc => {
+            switch (method) {
+                case 'weighted':
+                    const weightedc = w1 * proc.SingleCore + w2 * proc.MultiCore;
+                    proc.Result = weightedc / proc.Price;
+                    break;
+                case 'logarithmic':
+                    proc.Result = Math.log(proc.SingleCore + 1) + Math.log(proc.MultiCore + 1);
+                    break;
+                case 'core_ratio':
+                    const cores = proc.Cores || 4; // Default cores if not available
+                    const performancePerCore = proc.MultiCore / cores;
+                    const pricePerCore = proc.Price / cores;
+                    proc.Result = pricePerCore !== 0 ? performancePerCore / pricePerCore : 0;
+                    break;
+                case 'tdp_weighted':
+                    const tdpProduct = proc.Price * proc.TDP;
+                    proc.Result = tdpProduct !== 0 ? (w1 * proc.SingleCore + w2 * proc.MultiCore) / tdpProduct : 0;
+                    break;
+                case 'complex':
+                    const tdpPrice = proc.Price * proc.TDP;
+                    proc.Result = tdpPrice !== 0 ? (w1 * Math.log(proc.SingleCore + 1) + w2 * Math.log(proc.MultiCore + 1)) / tdpPrice : 0;
+                    break;
+                default:
+                    proc.Result = 0;
+            }
+        });
+
+        displayData();
+    }
+
+    function sortTable(n) {
+        const table = document.getElementById("processorTable");
+        let rows, switching, i, x, y, shouldSwitch, dir, switchCount = 0;
+        switching = true;
+        dir = "asc";
+        while (switching) {
+            switching = false;
+            rows = table.rows;
+            for (i = 1; i < (rows.length - 1); i++) {
+                shouldSwitch = false;
+                x = rows[i].getElementsByTagName("TD")[n];
+                y = rows[i + 1].getElementsByTagName("TD")[n];
+                let xContent = isNaN(x.innerHTML) ? x.innerHTML.toLowerCase() : parseFloat(x.innerHTML);
+                let yContent = isNaN(y.innerHTML) ? y.innerHTML.toLowerCase() : parseFloat(y.innerHTML);
+                if (dir === "asc") {
+                    if (xContent > yContent) {
+                        shouldSwitch = true;
+                        break;
+                    }
+                } else if (dir === "desc") {
+                    if (xContent < yContent) {
+                        shouldSwitch = true;
+                        break;
+                    }
+                }
+            }
+            if (shouldSwitch) {
+                rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                switching = true;
+                switchCount++;
+            } else {
+                if (switchCount === 0 && dir === "asc") {
+                    dir = "desc";
+                    switching = true;
+                }
+            }
+        }
+    }
+
+    $(document).ready(function() {
+        loadCSV();
+        addParameters();
+
+        $('#calculationMethod').change(function() {
+            addParameters();
+            calculateResults();
+        });
+
+        $('#calculate').click(function() {
+            calculateResults();
+        });
+
+        $('#update').click(function() {
+            $.ajax({
+                url: '/update_data',  // Assuming Flask is running on localhost:5000
+                type: 'POST',
+                success: function(response) {
+                    alert(response.status);
+                    setTimeout(function() {
+                        loadCSV();  // Reload the CSV data after updating
+                    }, 5000); // Wait 5 seconds for the CSV to update
+                },
+                error: function(xhr, status, error) {
+                    alert("Error updating data: " + xhr.responseText);
+                }
+            }); // <-- Closing parenthesis and semicolon for $.ajax
+        }); // <-- Closing parenthesis for $('#update').click
+    });
+</script>
+
+
+</body>
+</html>
