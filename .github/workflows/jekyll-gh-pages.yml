@@ -1,0 +1,57 @@
+name: Deploy static site to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js (optional, depending on your build)
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+      - name: Install dependencies (optional, if you have any)
+        run: npm install
+
+      - name: Build project (optional, if you have any build process like bundling)
+        run: npm run build
+
+      - name: Move final.html to the root (or set static directory)
+        run: |
+          mkdir -p _site
+          cp -R ./static/* _site/
+          
+      - name: Upload artifact for deployment
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./_site  # Deploy the content from the _site folder
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      pages: write  # to deploy to GitHub Pages
+      id-token: write  # to create a deployment token
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
