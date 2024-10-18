@@ -1,3 +1,4 @@
+import os
 from flask import Flask, jsonify, request, send_from_directory
 import subprocess
 import threading
@@ -28,5 +29,6 @@ def serve_index():
     return send_from_directory(app.static_folder, "final.html")
 
 if __name__ == '__main__':
-    # Run the Flask app on all IP addresses on port 5000
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Use the port provided by Railway, or default to 5000
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
