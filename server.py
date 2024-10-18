@@ -26,7 +26,7 @@ def update_data():
 
 @app.route('/')
 def serve_index():
-    return send_from_directory(app.static_folder, "final.html")
+    return send_from_directory(app.static_folder, "index.html")
 
 if __name__ == '__main__':
     # Use the port provided by Railway, or default to 5000
