@@ -2,8 +2,14 @@ import os
 from flask import Flask, jsonify, request, send_from_directory
 import subprocess
 import threading
+import csv
+from flask_cors import CORS
 
 app = Flask(__name__, static_url_path='', static_folder='static')
+
+
+cors = CORS(app, origins="*")
+
 
 # Function to run the script in a separate thread
 def run_script():
@@ -27,6 +33,20 @@ def update_data():
 @app.route('/')
 def serve_index():
     return send_from_directory(app.static_folder, "index.html")
+
+
+@app.route('/get_processor_data', methods=['POST'])
+def get_processor_data():
+    jsonArray = []
+    with open(app.static_folder + "\\processor_data.csv", encoding='utf-8') as csvf:
+        csvReader = csv.DictReader(csvf) 
+
+        for row in csvReader: 
+            jsonArray.append(row)
+
+
+    return jsonArray, 200
+
 
 if __name__ == '__main__':
     # Use the port provided by Railway, or default to 5000
